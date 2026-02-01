@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>刮刮樂大數據監測</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Inter:wght@400;700;900&display=swap');
+        :root { 
+            --blue: #00d2ff; --red: #ff4757; --green: #2ed573; --gold: #fbc531; 
+            --bg: #05070a; --card: #12141c; --border: #1e222e; --gray: #7f8c8d;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: #e1e1e1; margin: 0; padding: 12px; }
+        .card { background: var(--card); padding: 15px; border-radius: 18px; margin-bottom: 12px; border: 1px solid var(--border); position: relative; }
+        
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .book-id { font-family: 'JetBrains Mono'; color: var(--gold); font-size: 18px; font-weight: 900; }
+        
+        /* 刮刮樂格子 */
+        .scratch-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin: 10px 0; }
+        .ticket { 
+            aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--border); 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 900; background: #000; transition: 0.2s;
+        }
+        .ticket.active { border-color: var(--blue); box-shadow: 0 0 8px rgba(0,210,255,0.3); }
+        .ticket.recorded { background: var(--border); color: #fff; }
+        .ticket.big-win { background: rgba(46, 213, 115, 0.2); color: var(--green); border-color: var(--green); }
+        .ticket.unknown { background: rgba(127, 140, 141, 0.2); color: var(--gray); border-style: dashed; }
+
+        /* 金額快選區 */
+        .price-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 15px; }
+        .p-btn { padding: 12px 5px; border-radius: 10px; border: none; font-weight: 900; font-size: 12px; cursor: pointer; text-align: center; }
+        .btn-zero { background: #333; color: #fff; }
+        .btn-norm { background: var(--blue); color: #000; }
+        .btn-big { background: var(--green); color: #000; }
+        .btn-guess { background: var(--gray); color: #000; }
+
+        /* 提醒燈 */
+        .alert-bar { 
+            padding: 10px; border-radius: 10px; font-size: 12px; font-weight: 900; text-align: center; margin-bottom: 10px;
+            display: none; animation: blink 1.5s infinite;
+        }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .alert-on { display: block; background: rgba(251, 197, 49, 0.1); color: var(--gold); border: 1px solid var(--gold); }
+
+        .stat-line { font-size: 12px; color: var(--gray); margin-top: 5px; }
+        input[type="text"], input[type="number"] { background: #000; border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="header-flex">
+            <input type="text" id="inputBookID" placeholder="輸入本號 (如 638862-021)" style="flex:2; margin-right:5px;">
+            <select id="typeSelect" style="flex:1; background:#000; color:#fff; padding:10px; border-radius:8px; border:1px solid var(--border);">
+                <option value="2000">2000元</option>
+                <option value="1000">1000元</option>
+            </select>
+        </div>
+        <button onclick="newBook()" style="width:100%; padding:10px; background:var(--blue); border:none; border-radius:8px; font-weight:900; margin-top:5px;">📖 開新本 / 更換本號</button>
+    </div>
+
+    <div id="alertBox" class="alert-bar">⚠️ 大獎尚未出現！剩餘機率極高，建議推薦</div>
+
+    <div class="card">
+        <div class="header-flex">
+            <span class="book-id" id="displayID">未設定本號</span>
+            <span id="ticketCount" style="color:var(--gray); font-size:12px;">0/0</span>
+        </div>
+        
+        <div id="scratchGrid" class="scratch-grid"></div>
+
+        <div id="quickEdit" style="display:none;">
+            <div style="color:var(--gray); font-size:11px; margin-bottom:8px;">正在編輯第 <span id="editingNum" style="color:var(--blue)">-</span> 張：</div>
+            <div class="price-btns" id="priceControls"></div>
+            <div style="margin-top:10px; display:flex; gap:5px;">
+                <input type="number" id="customPrice" placeholder="自訂金額">
+                <button class="p-btn btn-norm" onclick="recordPrice('custom')" style="flex:none; width:60px;">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <b style="color:var(--gray); font-size:12px;">📊 本冊累計統計</b>
+        <div class="stat-line">目前回獎總額：<span id="totalReturn" style="color:var(--green)">0</span> 元</div>
+        <div class="stat-line">剩餘張數：<span id="remainCount">0</span></div>
+    </div>
+
+<script>
+    let currentBook = { id: '', type: 2000, data: {} };
+    let selectedIdx = -1;
+
+    const config = {
+        '2000': { total: 18, prizes: [0, 1000, 2000, 5000], big: 5000 },
+        '1000': { total: 25, prizes: [0, 500, 1000, 2000], big: 2000 }
+    };
+
+    function newBook() {
+        const id = document.getElementById('inputBookID').value;
+        const type = document.getElementById('typeSelect').value;
+        if(!id) return alert("請輸入本號");
+        
+        currentBook = { id: id, type: type, data: {} };
+        selectedIdx = -1;
+        document.getElementById('displayID').innerText = id;
+        document.getElementById('quickEdit').style.display = 'none';
+        renderGrid();
+    }
+
+    function renderGrid() {
+        const conf = config[currentBook.type];
+        const grid = document.getElementById('scratchGrid');
+        grid.innerHTML = '';
+        
+        let recordedCount = 0;
+        let bigPrizeFound = false;
+
+        for(let i=1; i<=conf.total; i++) {
+            const val = currentBook.data[i];
+            let statusClass = '';
+            let displayVal = i;
+
+            if (val !== undefined) {
+                recordedCount++;
+                displayVal = val === -1 ? '?' : (val >= 1000 ? (val/1000)+'k' : val);
+                statusClass = 'recorded';
+                if(val >= conf.big) { statusClass = 'big-win'; bigPrizeFound = true; }
+                if(val === -1) statusClass = 'unknown';
+            }
+
+            const div = document.createElement('div');
+            div.className = `ticket ${statusClass} ${selectedIdx === i ? 'active' : ''}`;
+            div.innerHTML = `<span>${i}</span><span style="font-size:9px">${val !== undefined ? displayVal : ''}</span>`;
+            div.onclick = () => selectTicket(i);
+            grid.appendChild(div);
+        }
+
+        // 邏輯提醒：剩餘 1/3 張數且大獎沒出
+        const remain = conf.total - recordedCount;
+        const alertBox = document.getElementById('alertBox');
+        if(!bigPrizeFound && recordedCount > (conf.total / 2) && remain > 0) {
+            alertBox.classList.add('alert-on');
+        } else {
+            alertBox.classList.remove('alert-on');
+        }
+
+        document.getElementById('ticketCount').innerText = `${recordedCount}/${conf.total}`;
+        document.getElementById('remainCount').innerText = remain;
+        updateStats();
+    }
+
+    function selectTicket(idx) {
+        selectedIdx = idx;
+        document.getElementById('quickEdit').style.display = 'block';
+        document.getElementById('editingNum').innerText = idx;
+        
+        const conf = config[currentBook.type];
+        const ctrl = document.getElementById('priceControls');
+        ctrl.innerHTML = conf.prizes.map(p => `
+            <button class="p-btn ${p===0?'btn-zero':(p>=conf.big?'btn-big':'btn-norm')}" 
+                    onclick="recordPrice(${p})">${p===0?'沒中':p}</button>
+        `).join('') + `<button class="p-btn btn-guess" onclick="recordPrice(-1)">未知</button>`;
+        
+        renderGrid();
+    }
+
+    function recordPrice(val) {
+        if(selectedIdx === -1) return;
+        if(val === 'custom') {
+            val = parseInt(document.getElementById('customPrice').value) || 0;
+            document.getElementById('customPrice').value = '';
+        }
+        currentBook.data[selectedIdx] = val;
+        
+        // 自動跳下一張
+        const conf = config[currentBook.type];
+        if(selectedIdx < conf.total) {
+            selectedIdx++;
+            document.getElementById('editingNum').innerText = selectedIdx;
+        } else {
+            selectedIdx = -1;
+            document.getElementById('quickEdit').style.display = 'none';
+        }
+        
+        renderGrid();
+    }
+
+    function updateStats() {
+        let total = 0;
+        Object.values(currentBook.data).forEach(v => {
+            if(v > 0) total += v;
+        });
+        document.getElementById('totalReturn').innerText = total.toLocaleString();
+    }
+</script>
+</body>
+</html>
+
