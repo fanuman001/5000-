@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ELITE 刮刮樂監控</title>
+    <title>ELITE 獲利監控系統</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Inter:wght@400;700;900&display=swap');
@@ -14,34 +14,50 @@
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: #e1e1e1; margin: 0; padding: 12px; }
         .card { background: var(--card); padding: 15px; border-radius: 18px; margin-bottom: 15px; border: 1px solid var(--border); position: relative; }
         
-        /* 🎨 顏色邏輯分級 */
-        .c-zero { background: rgba(255, 71, 87, 0.4) !important; color: white !important; border: 1.5px solid var(--red) !important; } /* 沒中 紅色 */
-        .c-low { background: rgba(251, 197, 49, 0.2) !important; color: var(--gold) !important; border: 1.5px solid var(--gold) !important; } /* 低於 黃色 */
-        .c-even { background: rgba(0, 210, 255, 0.2) !important; color: var(--blue) !important; border: 1.5px solid var(--blue) !important; } /* 打平 藍色 */
-        .c-high { background: rgba(46, 213, 115, 0.2) !important; color: var(--green) !important; border: 1.5px solid var(--green) !important; } /* 高於 綠色 */
-        .c-big { 
-            background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000) !important; 
-            color: #000 !important; font-weight: 900; animation: rainbow 2s linear infinite;
-        } /* 5000+ 彩色 */
-        .c-unknown { background: rgba(168, 85, 247, 0.3) !important; color: #e9d5ff !important; border: 2px dashed var(--purple) !important; } /* 未知 紫色 */
+        /* 🎨 顏色與狀態 */
+        .c-zero { background: rgba(255, 71, 87, 0.4) !important; color: white !important; border: 1.5px solid var(--red) !important; }
+        .c-low { background: rgba(251, 197, 49, 0.2) !important; color: var(--gold) !important; border: 1.5px solid var(--gold) !important; }
+        .c-even { background: rgba(0, 210, 255, 0.2) !important; color: var(--blue) !important; border: 1.5px solid var(--blue) !important; }
+        .c-high { background: rgba(46, 213, 115, 0.2) !important; color: var(--green) !important; border: 1.5px solid var(--green) !important; }
+        .c-big { background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000) !important; color: #000 !important; font-weight: 900; animation: rainbow 2s linear infinite; }
+        .c-unknown { background: rgba(168, 85, 247, 0.3) !important; color: #e9d5ff !important; border: 2px dashed var(--purple) !important; }
 
         @keyframes rainbow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
 
+        /* 網格系統 */
         .scratch-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 10px 0; }
-        .ticket { aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 13px; font-family: 'JetBrains Mono'; font-weight: 900; background: #000; }
-        .ticket.active { outline: 3px solid #fff; z-index: 10; transform: scale(1.1); }
-        .btn-del { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--gray); font-size: 20px; }
-        .control-panel { display: flex; gap: 8px; margin-top: 10px; }
-        input, select { background: #000; border: 1px solid var(--border); color: #fff; padding: 12px; border-radius: 10px; flex: 1; }
-        .add-btn { background: var(--blue); color: #000; font-weight: 900; border: none; padding: 0 20px; border-radius: 10px; }
+        .ticket { aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-family: 'JetBrains Mono'; font-weight: 900; background: #000; position: relative; }
+        .ticket span { font-size: 8px; font-weight: 400; opacity: 0.8; }
+        .ticket.active { outline: 3px solid #fff; z-index: 10; transform: scale(1.05); }
+
+        /* 數據欄位 */
+        .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .stat-box { background: #000; padding: 8px; border-radius: 10px; border: 1px solid var(--border); text-align: center; }
+        .stat-val { display: block; font-family: 'JetBrains Mono'; font-size: 13px; color: var(--blue); }
+        .stat-label { font-size: 9px; color: var(--gray); text-transform: uppercase; }
+
+        /* 導航與切換 */
+        .nav { display: flex; gap: 8px; margin-bottom: 12px; }
+        .nav-btn { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--gray); font-weight: 900; font-size: 13px; }
+        .nav-btn.active { background: var(--blue); color: #000; border-color: var(--blue); }
+
+        .btn-del { position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--gray); font-size: 18px; }
+        input, select { background: #000; border: 1px solid var(--border); color: #fff; padding: 12px; border-radius: 10px; flex: 1; font-size: 14px; }
+        .add-btn { background: var(--green); color: #000; font-weight: 900; border: none; padding: 0 20px; border-radius: 10px; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <b style="color:var(--gold); font-size:14px;">➕ 新增刮刮樂本 (即時聯網)</b>
-        <div class="control-panel">
-            <input type="text" id="newID" placeholder="請輸入本號">
+    <div class="nav">
+        <button id="mode-edit" class="nav-btn active" onclick="setMode('edit')">🛠 紀錄模式</button>
+        <button id="mode-view" class="nav-btn" onclick="setMode('view')">👁 僅閱覽</button>
+    </div>
+
+    <div id="editor-top" class="card">
+        <b style="color:var(--gold); font-size:14px;">➕ 建立監控本</b>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+            <input type="text" id="newID" placeholder="輸入本號 (如 021)">
             <select id="newType">
                 <option value="2000">2000元</option>
                 <option value="1000">1000元</option>
@@ -59,69 +75,100 @@
 
     let books = [];
     let editingTarget = { bookIdx: -1, ticketNum: -1 };
+    let viewMode = false;
 
     async function init() {
-        const { data, error } = await supabaseClient.from('scratch_books').select('*').order('created_at', { ascending: false });
-        if (error) console.error("讀取失敗:", error);
+        const { data } = await supabaseClient.from('scratch_books').select('*').order('created_at', { ascending: false });
         books = data || [];
+        render();
+    }
+
+    function setMode(mode) {
+        viewMode = (mode === 'view');
+        document.getElementById('mode-edit').classList.toggle('active', !viewMode);
+        document.getElementById('mode-view').classList.toggle('active', viewMode);
+        document.getElementById('editor-top').classList.toggle('hidden', viewMode);
+        editingTarget = { bookIdx: -1, ticketNum: -1 };
         render();
     }
 
     async function addBook() {
         const id = document.getElementById('newID').value;
         const type = parseInt(document.getElementById('newType').value);
-        if(!id) return alert("請輸入本號");
-        const { error } = await supabaseClient.from('scratch_books').insert([{ book_id: id, book_type: type, ticket_data: {} }]);
-        if(!error) { document.getElementById('newID').value = ''; init(); }
-    }
-
-    async function deleteBook(dbId) {
-        if(!confirm("確定要移除這本嗎？")) return;
-        await supabaseClient.from('scratch_books').delete().eq('id', dbId);
+        if(!id) return;
+        await supabaseClient.from('scratch_books').insert([{ book_id: id, book_type: type, ticket_data: {} }]);
+        document.getElementById('newID').value = '';
         init();
     }
 
-    function getTicketClass(val, type) {
-        if (val === undefined) return '';
-        if (val === -1) return 'c-unknown'; // 紫色
-        if (val === 0) return 'c-zero'; // 紅色
-        if (val >= 5000) return 'c-big'; // 彩色
-        if (val > type) return 'c-high'; // 綠色
-        if (val === type) return 'c-even'; // 藍色
-        if (val < type) return 'c-low'; // 黃色
-        return '';
+    async function deleteBook(dbId) {
+        if(!confirm("確定移除此本？")) return;
+        await supabaseClient.from('scratch_books').delete().eq('id', dbId);
+        init();
     }
 
     function render() {
         const list = document.getElementById('bookList');
         list.innerHTML = books.map((b, bIdx) => {
             const total = b.book_type === 2000 ? 18 : 25;
+            const bookCost = b.book_type === 2000 ? 36000 : 25000;
             let ticketsHtml = '';
             let bigFound = false;
             let recorded = 0;
+            let totalWin = 0;
 
             for(let i=1; i<=total; i++) {
                 const val = b.ticket_data[i];
-                if(val !== undefined) recorded++;
+                if(val !== undefined) {
+                    recorded++;
+                    if(val > 0) totalWin += val;
+                }
                 if(val >= 5000) bigFound = true;
                 const active = (editingTarget.bookIdx === bIdx && editingTarget.ticketNum === i) ? 'active' : '';
-                ticketsHtml += `<div class="ticket ${getTicketClass(val, b.book_type)} ${active}" onclick="setEdit(${bIdx}, ${i})">${i}</div>`;
+                const displayVal = (val === undefined) ? i : (val === -1 ? '?' : (val === 0 ? 'X' : val));
+                
+                ticketsHtml += `
+                    <div class="ticket ${getTicketClass(val, b.book_type)} ${active}" 
+                         onclick="${viewMode ? '' : `setEdit(${bIdx}, ${i})`}">
+                        ${displayVal}
+                        ${val !== undefined && val > 0 ? `<span>${i}號</span>` : ''}
+                    </div>`;
             }
 
-            const alertShow = (!bigFound && recorded > total/2) ? 'block' : 'none';
+            const alertShow = (!bigFound && recorded > total/2);
+            const profit = totalWin - (recorded * b.book_type);
 
             return `
                 <div class="card">
-                    <button class="btn-del" onclick="deleteBook(${b.id})">✕</button>
+                    ${viewMode ? '' : `<button class="btn-del" onclick="deleteBook(${b.id})">✕</button>`}
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <b style="color:var(--gold)">${b.book_id} <small style="color:var(--gray)">(${b.book_type}元)</small></b>
-                        <div style="background:var(--red); color:#000; font-size:10px; padding:4px 8px; border-radius:5px; display:${alertShow}; font-weight:900">🚨 大獎未出</div>
+                        <b style="color:var(--gold); font-size:16px;">${b.book_id} <small style="color:var(--gray); font-weight:400">#${recorded}/${total}</small></b>
+                        ${alertShow ? `<div style="background:var(--red); color:#000; font-size:10px; padding:4px 8px; border-radius:6px; font-weight:900">🚨 大獎未出</div>` : ''}
                     </div>
+                    
                     <div class="scratch-grid">${ticketsHtml}</div>
-                    ${editingTarget.bookIdx === bIdx ? renderEditor(b.book_type) : ''}
+
+                    <div class="stats-row">
+                        <div class="stat-box"><span class="stat-label">回獎總計</span><span class="stat-val" style="color:var(--green)">$${totalWin}</span></div>
+                        <div class="stat-box"><span class="stat-label">當前損益</span><span class="stat-val" style="color:${profit>=0?'var(--green)':'var(--red)'}">${profit >= 0 ? '+'+profit : profit}</span></div>
+                        <div class="stat-box"><span class="stat-label">回獎率</span><span class="stat-val">${recorded ? ((totalWin/(recorded*b.book_type))*100).toFixed(1) : 0}%</span></div>
+                    </div>
+
+                    ${editingTarget.bookIdx === bIdx && !viewMode ? renderEditor(b.book_type) : ''}
                 </div>
             `;
         }).join('');
+    }
+
+    function getTicketClass(val, type) {
+        if (val === undefined) return '';
+        if (val === -1) return 'c-unknown';
+        if (val === 0) return 'c-zero';
+        if (val >= 5000) return 'c-big';
+        if (val > type) return 'c-high';
+        if (val === type) return 'c-even';
+        if (val < type) return 'c-low';
+        return '';
     }
 
     function setEdit(bIdx, tNum) {
@@ -132,13 +179,13 @@
     function renderEditor(type) {
         const prizes = type === 2000 ? [0, 1000, 2000, 5000] : [0, 500, 1000, 2000];
         return `
-            <div style="background:#000; padding:15px; border-radius:12px; margin-top:10px; border:1px solid var(--border)">
-                <div style="font-size:12px; color:var(--blue); margin-bottom:10px">錄入第 ${editingTarget.ticketNum} 張金額：</div>
+            <div style="background:#000; padding:15px; border-radius:12px; margin-top:12px; border:1px solid var(--blue)">
+                <div style="font-size:12px; color:var(--blue); margin-bottom:10px">錄入 第 ${editingTarget.ticketNum} 張：</div>
                 <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px">
-                    ${prizes.map(p => `<button onclick="saveTicket(${p})" style="padding:10px; border-radius:8px; border:none; background:var(--card); color:#fff; font-weight:700">${p===0?'沒中':p}</button>`).join('')}
-                    <button onclick="saveTicket(-1)" style="padding:10px; border-radius:8px; border:none; background:var(--purple); color:#fff; font-weight:700">帶出去</button>
-                    <input type="number" id="manualPrice" placeholder="自訂金額" style="grid-column: span 2; padding:8px">
-                    <button onclick="saveTicket('custom')" style="background:var(--blue); border:none; border-radius:8px; font-weight:900">儲存</button>
+                    ${prizes.map(p => `<button onclick="saveTicket(${p})" style="padding:12px 5px; border-radius:8px; border:none; background:var(--card); color:#fff; font-weight:900">${p===0?'沒中':p}</button>`).join('')}
+                    <button onclick="saveTicket(-1)" style="padding:12px 5px; border-radius:8px; border:none; background:var(--purple); color:#fff; font-weight:900">帶走</button>
+                    <input type="number" id="manualPrice" placeholder="自訂" style="grid-column: span 2; padding:8px">
+                    <button onclick="saveTicket('custom')" style="background:var(--blue); border:none; border-radius:8px; font-weight:900">OK</button>
                 </div>
             </div>
         `;
@@ -147,18 +194,12 @@
     async function saveTicket(val) {
         const { bookIdx, ticketNum } = editingTarget;
         if(val === 'custom') val = parseInt(document.getElementById('manualPrice').value) || 0;
-        
         const book = books[bookIdx];
         book.ticket_data[ticketNum] = val;
-        
-        const { error } = await supabaseClient.from('scratch_books').update({ ticket_data: book.ticket_data }).eq('id', book.id);
-        
-        if(!error) {
-            const total = book.book_type === 2000 ? 18 : 25;
-            if(ticketNum < total) editingTarget.ticketNum++;
-            else editingTarget = { bookIdx: -1, ticketNum: -1 };
-            render();
-        }
+        await supabaseClient.from('scratch_books').update({ ticket_data: book.ticket_data }).eq('id', book.id);
+        if(ticketNum < (book.book_type === 2000 ? 18 : 25)) editingTarget.ticketNum++;
+        else editingTarget = { bookIdx: -1, ticketNum: -1 };
+        render();
     }
 
     init();
