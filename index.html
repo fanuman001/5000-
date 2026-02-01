@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ELITE 獲利監控系統</title>
+    <title>ELITE 獲利監控系統 v7.5</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Inter:wght@400;700;900&display=swap');
@@ -14,7 +14,7 @@
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: #e1e1e1; margin: 0; padding: 12px; }
         .card { background: var(--card); padding: 15px; border-radius: 18px; margin-bottom: 15px; border: 1px solid var(--border); position: relative; }
         
-        /* 🎨 顏色與狀態 */
+        /* 🎨 顏色邏輯 */
         .c-zero { background: rgba(255, 71, 87, 0.4) !important; color: white !important; border: 1.5px solid var(--red) !important; }
         .c-low { background: rgba(251, 197, 49, 0.2) !important; color: var(--gold) !important; border: 1.5px solid var(--gold) !important; }
         .c-even { background: rgba(0, 210, 255, 0.2) !important; color: var(--blue) !important; border: 1.5px solid var(--blue) !important; }
@@ -24,25 +24,24 @@
 
         @keyframes rainbow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
 
-        /* 網格系統 */
-        .scratch-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 10px 0; }
-        .ticket { aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-family: 'JetBrains Mono'; font-weight: 900; background: #000; position: relative; }
-        .ticket span { font-size: 8px; font-weight: 400; opacity: 0.8; }
+        .scratch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 10px 0; }
+        .ticket { aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-family: 'JetBrains Mono'; font-weight: 900; background: #000; position: relative; cursor: pointer; }
+        .ticket span { font-size: 8px; font-weight: 400; opacity: 0.6; margin-top: 2px; }
         .ticket.active { outline: 3px solid #fff; z-index: 10; transform: scale(1.05); }
 
-        /* 數據欄位 */
         .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
-        .stat-box { background: #000; padding: 8px; border-radius: 10px; border: 1px solid var(--border); text-align: center; }
-        .stat-val { display: block; font-family: 'JetBrains Mono'; font-size: 13px; color: var(--blue); }
-        .stat-label { font-size: 9px; color: var(--gray); text-transform: uppercase; }
+        .stat-box { background: #000; padding: 10px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
+        .stat-val { display: block; font-family: 'JetBrains Mono'; font-size: 14px; color: var(--blue); }
+        .stat-label { font-size: 9px; color: var(--gray); text-transform: uppercase; margin-bottom: 2px; }
 
-        /* 導航與切換 */
         .nav { display: flex; gap: 8px; margin-bottom: 12px; }
-        .nav-btn { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--gray); font-weight: 900; font-size: 13px; }
+        .nav-btn { flex: 1; padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); color: var(--gray); font-weight: 900; }
         .nav-btn.active { background: var(--blue); color: #000; border-color: var(--blue); }
 
         .btn-del { position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--gray); font-size: 18px; }
-        input, select { background: #000; border: 1px solid var(--border); color: #fff; padding: 12px; border-radius: 10px; flex: 1; font-size: 14px; }
+        .btn-reset { background: #333 !important; color: #ff4757 !important; grid-column: span 4; margin-top: 5px; border: 1px solid #ff475733 !important; }
+        
+        input, select { background: #000; border: 1px solid var(--border); color: #fff; padding: 12px; border-radius: 10px; flex: 1; }
         .add-btn { background: var(--green); color: #000; font-weight: 900; border: none; padding: 0 20px; border-radius: 10px; }
         .hidden { display: none !important; }
     </style>
@@ -57,10 +56,10 @@
     <div id="editor-top" class="card">
         <b style="color:var(--gold); font-size:14px;">➕ 建立監控本</b>
         <div style="display:flex; gap:8px; margin-top:10px;">
-            <input type="text" id="newID" placeholder="輸入本號 (如 021)">
+            <input type="text" id="newID" placeholder="本號">
             <select id="newType">
-                <option value="2000">2000元</option>
-                <option value="1000">1000元</option>
+                <option value="2000">2000元 (19張)</option>
+                <option value="1000">1000元 (25張)</option>
             </select>
             <button class="add-btn" onclick="addBook()">新增</button>
         </div>
@@ -110,8 +109,7 @@
     function render() {
         const list = document.getElementById('bookList');
         list.innerHTML = books.map((b, bIdx) => {
-            const total = b.book_type === 2000 ? 18 : 25;
-            const bookCost = b.book_type === 2000 ? 36000 : 25000;
+            const total = b.book_type === 2000 ? 19 : 25;
             let ticketsHtml = '';
             let bigFound = false;
             let recorded = 0;
@@ -125,13 +123,15 @@
                 }
                 if(val >= 5000) bigFound = true;
                 const active = (editingTarget.bookIdx === bIdx && editingTarget.ticketNum === i) ? 'active' : '';
-                const displayVal = (val === undefined) ? i : (val === -1 ? '?' : (val === 0 ? 'X' : val));
                 
+                // 閱覽模式顯示金額，編輯模式顯示號碼
+                let displayMain = viewMode ? (val === undefined ? i : (val === -1 ? '?' : (val === 0 ? 'X' : val))) : i;
+                let displaySub = viewMode ? (val !== undefined ? `<span>${i}號</span>` : '') : (val !== undefined ? `<span>${val===-1?'?':(val===0?'X':val)}</span>` : '');
+
                 ticketsHtml += `
                     <div class="ticket ${getTicketClass(val, b.book_type)} ${active}" 
                          onclick="${viewMode ? '' : `setEdit(${bIdx}, ${i})`}">
-                        ${displayVal}
-                        ${val !== undefined && val > 0 ? `<span>${i}號</span>` : ''}
+                        ${displayMain}${displaySub}
                     </div>`;
             }
 
@@ -180,12 +180,13 @@
         const prizes = type === 2000 ? [0, 1000, 2000, 5000] : [0, 500, 1000, 2000];
         return `
             <div style="background:#000; padding:15px; border-radius:12px; margin-top:12px; border:1px solid var(--blue)">
-                <div style="font-size:12px; color:var(--blue); margin-bottom:10px">錄入 第 ${editingTarget.ticketNum} 張：</div>
+                <div style="font-size:12px; color:var(--blue); margin-bottom:10px">正在編輯：第 <span style="font-size:16px">${editingTarget.ticketNum}</span> 張</div>
                 <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px">
-                    ${prizes.map(p => `<button onclick="saveTicket(${p})" style="padding:12px 5px; border-radius:8px; border:none; background:var(--card); color:#fff; font-weight:900">${p===0?'沒中':p}</button>`).join('')}
-                    <button onclick="saveTicket(-1)" style="padding:12px 5px; border-radius:8px; border:none; background:var(--purple); color:#fff; font-weight:900">帶走</button>
+                    ${prizes.map(p => `<button onclick="saveTicket(${p})" style="padding:14px 5px; border-radius:8px; border:none; background:var(--card); color:#fff; font-weight:900">${p===0?'沒中':p}</button>`).join('')}
+                    <button onclick="saveTicket(-1)" style="padding:14px 5px; border-radius:8px; border:none; background:var(--purple); color:#fff; font-weight:900">帶走</button>
                     <input type="number" id="manualPrice" placeholder="自訂" style="grid-column: span 2; padding:8px">
                     <button onclick="saveTicket('custom')" style="background:var(--blue); border:none; border-radius:8px; font-weight:900">OK</button>
+                    <button class="btn-reset" onclick="saveTicket('reset')">🔄 錯誤錄入？恢復為未登記</button>
                 </div>
             </div>
         `;
@@ -193,12 +194,25 @@
 
     async function saveTicket(val) {
         const { bookIdx, ticketNum } = editingTarget;
-        if(val === 'custom') val = parseInt(document.getElementById('manualPrice').value) || 0;
         const book = books[bookIdx];
-        book.ticket_data[ticketNum] = val;
+
+        if (val === 'reset') {
+            delete book.ticket_data[ticketNum];
+        } else {
+            if(val === 'custom') val = parseInt(document.getElementById('manualPrice').value) || 0;
+            book.ticket_data[ticketNum] = val;
+        }
+        
         await supabaseClient.from('scratch_books').update({ ticket_data: book.ticket_data }).eq('id', book.id);
-        if(ticketNum < (book.book_type === 2000 ? 18 : 25)) editingTarget.ticketNum++;
-        else editingTarget = { bookIdx: -1, ticketNum: -1 };
+        
+        // 如果是恢復，不跳下一張；如果是正常錄入，自動跳下一張
+        if(val !== 'reset' && ticketNum < (book.book_type === 2000 ? 19 : 25)) {
+            editingTarget.ticketNum++;
+        } else if (val === 'reset') {
+            // 保持在原位方便重新錄入
+        } else {
+            editingTarget = { bookIdx: -1, ticketNum: -1 };
+        }
         render();
     }
 
